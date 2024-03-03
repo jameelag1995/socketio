@@ -6,21 +6,67 @@ const messageInput = document.querySelector("#message-input");
 const sendMessageBtn = document.querySelector("#send-message-btn");
 const sendLocationBtn = document.querySelector("#send-location-btn");
 const messages = document.querySelector("#messages");
-
+const sidebar = document.querySelector("#sidebar");
 // Templates
 const messageTemplate = document.querySelector("#message-template").innerHTML;
 const linkTemplate = document.querySelector("#link-template").innerHTML;
+const sidebarTemplate = document.querySelector("#sidebar-template").innerHTML;
 
-socket.on("message", (message) => {
-    console.log(message);
-    const html = Mustache.render(messageTemplate, { message });
-    messages.insertAdjacentHTML("beforeend", html);
+// Options
+const { username, room } = Qs.parse(location.search, {
+    ignoreQueryPrefix: true,
 });
 
-socket.on("locationMessage", (location) => {
-    console.log(location);
-    const html = Mustache.render(linkTemplate, { location });
+const autoscroll = () => {
+    //  New message element
+    let newMessageElem = messages.lastElementChild;
+
+    // Height of  the new message
+    const newMessageStyles = getComputedStyle(newMessageElem);
+    const newMessageMargin = parseInt(newMessageStyles.marginBottom);
+    const newMessageHeight = newMessageElem.offsetHeight + newMessageMargin;
+
+    // Visible Height
+    const visibleHeight = messages.offsetHeight;
+
+    // Height of messages container
+    const containerHeight = messages.scrollHeight;
+    // How far have we scrolled?
+    const scrollOffset = messages.scrollTop + visibleHeight;
+
+    if (containerHeight - newMessageHeight <= scrollOffset) {
+        messages.scrollTop = containerHeight;
+    }
+    
+};
+
+socket.on("message", (message) => {
+    // console.log(message);
+    const html = Mustache.render(messageTemplate, {
+        username: message.username,
+        message: message.text,
+        createdAt: moment(message.createdAt).format("h:mm  a"),
+    });
     messages.insertAdjacentHTML("beforeend", html);
+    autoscroll();
+});
+
+socket.on("locationMessage", (message) => {
+    // console.log(message);
+    const html = Mustache.render(linkTemplate, {
+        username: message.username,
+        location: message.url,
+        createdAt: moment(message.createdAt).format("h:mm  a"),
+    });
+    messages.insertAdjacentHTML("beforeend", html);
+    autoscroll();
+});
+
+socket.on("roomData", ({ room, users }) => {
+    console.log(room);
+    console.log(users);
+    const html = Mustache.render(sidebarTemplate, { room, users });
+    sidebar.innerHTML = html;
 });
 
 messageForm.addEventListener("submit", (e) => {
@@ -56,4 +102,11 @@ sendLocationBtn.addEventListener("click", () => {
             }
         );
     });
+});
+
+socket.emit("join", { username, room }, (error) => {
+    if (error) {
+        alert(error);
+        location.href = "/";
+    }
 });
